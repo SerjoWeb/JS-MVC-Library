@@ -1,55 +1,58 @@
 ;(function(r) {
-  'use strict';
+    'use strict';
+  
+    const { gulp, dest, src, build, watch, series } = r('gulp');
+    const sass         = r('gulp-sass')(require('sass'));
+    const browserify   = r('browserify');
+    const babelify     = r('babelify');
+    const source       = r('vinyl-source-stream');
+    const buffer       = r('vinyl-buffer');
+    const uglify       = r('gulp-uglify');
+    const sourcemaps   = r('gulp-sourcemaps');
+    const autoprefixer = r('gulp-autoprefixer');
+    const livereload   = r('gulp-livereload');
+    const browserSync  = r('browser-sync').create();
+    const port         = process.env.SERVER_PORT || 4444;
+  
+    const applyProdEnvironment = () => {
+      return process.env.NODE_ENV = 'development';
+    };
 
-  var gulp         = r('gulp');
-  var sass         = r('gulp-sass');
-  var browserify   = r('browserify');
-  var babelify     = r('babelify');
-  var source       = r('vinyl-source-stream');
-  var buffer       = r('vinyl-buffer');
-  var uglify       = r('gulp-uglify');
-  var sourcemaps   = r('gulp-sourcemaps');
-  var autoprefixer = r('gulp-autoprefixer');
-  var livereload   = r('gulp-livereload');
-  var browserSync  = r('browser-sync').create();
-
-  gulp.task('apply-prod-environment', function() {
-    process.env.NODE_ENV = 'development';
-  });
-
-  gulp.task('js', function () {
-    return browserify({entries: './app/app.js', extensions: ['.js'], debug: true})
-      .transform('babelify', {presets: ['es2015']})
-      .bundle()
-      .pipe(source('app.js'))
-      .pipe(buffer())
-      .pipe(sourcemaps.init())
-      .pipe(uglify())
-      .pipe(sourcemaps.write())
-      .pipe(gulp.dest('./assets/js'))
-      .pipe(livereload())
-      .pipe(browserSync.stream());
-  });
-
-  gulp.task('sass', function() {
-    return gulp.src('./app/sass/*.scss')
-      .pipe(sass({outputStyle: 'compressed'}).on('error', sass.logError))
-      .pipe(sourcemaps.init())
-      .pipe(sourcemaps.write())
-      .pipe(autoprefixer())
-      .pipe(gulp.dest('./assets/css'))
-      .pipe(browserSync.stream());
-  });
-
-  gulp.task('serve', ['js', 'sass'], function() {
-    browserSync.init({
-      server: './'
-    });
-
-    gulp.watch('./app/**/*.js', ['js']);
-    gulp.watch('./app/sass/*.scss', ['sass']);
-    gulp.watch('./*.html').on('change', browserSync.reload);
-  });
-
-  gulp.task('default', ['apply-prod-environment', 'serve']);
-})(require);
+    const processJS = () => {
+      return browserify({entries: './app/app.js', extensions: ['.js'], debug: true})
+        .transform('babelify', {presets: ['@babel/preset-env']})
+        .bundle()
+        .pipe(source('app.js'))
+        .pipe(buffer())
+        .pipe(sourcemaps.init())
+        .pipe(uglify())
+        .pipe(sourcemaps.write())
+        .pipe(dest('./assets/js'))
+        .pipe(livereload())
+        .pipe(browserSync.stream());
+    };
+  
+    const processSass = () => {
+      return src('./app/sass/*.scss')
+        .pipe(sass({outputStyle: 'compressed'}).on('error', sass.logError))
+        .pipe(sourcemaps.init())
+        .pipe(sourcemaps.write())
+        .pipe(autoprefixer())
+        .pipe(dest('./assets/css'))
+        .pipe(browserSync.stream());
+    };
+  
+    const server = () => {
+      browserSync.init({
+        server: './',
+        port: port
+      });
+  
+      watch(['./app/**/*.js'], () => { processJS(); });
+      watch(['./app/sass/*.scss'], () => { processSass(); });
+      watch(['./*.html'], () => {}).on('change', browserSync.reload);
+    };
+  
+    exports.build = build;
+    exports.default = series(server);
+  })(require);
